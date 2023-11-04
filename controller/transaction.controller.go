@@ -1,12 +1,15 @@
 package controller
 
 import (
+	"fmt"
 	"math/rand"
+	"net/http"
 	"strconv"
 	"superior/config"
 	"superior/helper"
 	"superior/model"
 	"superior/utils"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -86,13 +89,54 @@ func TransactionLogic(c *fiber.Ctx) error {
 	}
 
 	//// create the block
-	utils.NewBlock(txns)
+	block := utils.NewBlock(txns, txnsMetaData)
+
 	//// brodcast the block
 	for i := 0; i < groups; i++ {
 		for j := 0; j < param; j++ {
 			//i-th group and j-th param
 			//for the jth parameter admins[j] is the admin
+			go func(I int, J int) {
+				ip := ips[I*param+J]
+				url := "http://" + ip + "/receive"
+				client := &http.Client{
+					Timeout: 20 * time.Millisecond,
+				}
+				headers := map[string]string{
+					"Content-Type": "application/json",
+					"group-id":     strconv.Itoa(I),
+					"param-id":     strconv.Itoa(J),
+					"admin-ip":     ips[admins[J]*param+J],
+				}
+				req, err := http.NewRequest("POST", url, nil) // Use nil for request body or set requestBody
+				if err != nil {
+					fmt.Println("Error creating the request:", err)
+					return
+				}
+
+				// Set multiple headers
+				for key, value := range headers {
+					req.Header.Set(key, value)
+				}
+
+				// Send the request
+				resp, err := client.Do(req)
+				if err != nil {
+					fmt.Println("Error sending the request:", err)
+					return
+				}
+				defer resp.Body.Close()
+
+				// Check the response status code
+				if resp.StatusCode == http.StatusOK {
+					fmt.Println("Request was successful.")
+				} else {
+					fmt.Printf("Request failed with status code: %d\n", resp.StatusCode)
+				}
+			}(i, j)
 		}
 	}
-	return c.Status(200).JSON(txnsMetaData)
+
+	//// return the response to the client node
+	return c.Status(200).JSON(block)
 }
