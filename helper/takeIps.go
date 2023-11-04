@@ -3,22 +3,22 @@ package helper
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"superior/model"
-	"sync"
+	"time"
 
 	"github.com/tecbot/gorocksdb"
 )
 
-func GetMempoolTxns() (<-chan func() (string, model.Transaction), <-chan bool, *sync.WaitGroup) {
-	out := make(chan func() (string, model.Transaction))
+func TakeIps() (<-chan string, <-chan bool) {
+	out := make(chan string)
 	done := make(chan bool)
-	wg := sync.WaitGroup{}
 	go func() {
-		// Open a RocksDB database
+		//// Open a RocksDB database
 		opts := gorocksdb.NewDefaultOptions()
 		defer opts.Destroy()
 		opts.SetCreateIfMissing(true)
-		db, err := gorocksdb.OpenDb(opts, "database/transaction")
+		db, err := gorocksdb.OpenDb(opts, "database/client")
 		if err != nil {
 			fmt.Println("Error opening database:", err)
 			done <- false
@@ -27,30 +27,34 @@ func GetMempoolTxns() (<-chan func() (string, model.Transaction), <-chan bool, *
 			return
 		}
 		defer db.Close()
-		// Reading data
+		//// Reading data
 		readOpts := gorocksdb.NewDefaultReadOptions()
 		defer readOpts.Destroy()
 		iter := db.NewIterator(readOpts)
 		defer iter.Close()
 		cnt := 0
 		for iter.SeekToFirst(); iter.Valid(); iter.Next() {
-			key := iter.Key()
 			value := iter.Value()
-			transaction := model.Transaction{}
-			if err := json.Unmarshal(value.Data(), &transaction); err != nil {
+			node := model.Client{}
+			if err := json.Unmarshal(value.Data(), &node); err != nil {
 				fmt.Println("Error deserializing data", err)
 				done <- false
 				close(done)
 				close(out)
 				return
 			}
-			wg.Add(1)
-			out <- (func() (string, model.Transaction) {
-				return string(key.Data()), transaction
-			})
-			wg.Wait()
+			ip := node.IP + ":" + fmt.Sprint(node.PORT)
+			url := "http://" + ip + "/alive"
+			client := &http.Client{
+				Timeout: 10 * time.Millisecond,
+			}
+			res, err := client.Head(url)
+			if err != nil || res.StatusCode != 200 {
+				continue
+			}
+			out <- ip
 			cnt++
-			if cnt == 20 {
+			if cnt == 5 {
 				break
 			}
 		}
@@ -58,5 +62,5 @@ func GetMempoolTxns() (<-chan func() (string, model.Transaction), <-chan bool, *
 		close(done)
 		close(out)
 	}()
-	return out, done, &wg
+	return out, done
 }
