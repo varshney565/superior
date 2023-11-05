@@ -17,7 +17,7 @@ func NewBlock(txns []model.Transaction, metadata []string) model.Block {
 	// get the address of current node
 	address := config.Config("HOST") + ":" + config.Config("PORT")
 	// get the current time
-	currentTime := time.Now().Format("2000-01-01 15:04:05")
+	currentTime := time.Now().Format("2006-01-02 15:04:05")
 	//generate the header
 	header := model.Header{
 		Merkleroot:      merkleRoot,

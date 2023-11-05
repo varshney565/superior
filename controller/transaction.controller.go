@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -90,6 +92,14 @@ func TransactionLogic(c *fiber.Ctx) error {
 
 	//// create the block
 	block := utils.NewBlock(txns, txnsMetaData)
+	hash := helper.GenerateBlockHash(block)
+	requestBody, Err := json.Marshal(block)
+	if Err != nil {
+		fmt.Println("Error marshaling JSON:", err)
+		return c.Status(500).JSON(fiber.Map{
+			"message": "Internal Server Error",
+		})
+	}
 
 	//// brodcast the block
 	for i := 0; i < groups; i++ {
@@ -107,8 +117,9 @@ func TransactionLogic(c *fiber.Ctx) error {
 					"group-id":     strconv.Itoa(I),
 					"param-id":     strconv.Itoa(J),
 					"admin-ip":     ips[admins[J]*param+J],
+					"block-hash":   hash,
 				}
-				req, err := http.NewRequest("POST", url, nil) // Use nil for request body or set requestBody
+				req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestBody)) // Use nil for request body or set requestBody
 				if err != nil {
 					fmt.Println("Error creating the request:", err)
 					return
