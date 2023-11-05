@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"superior/config"
 	"superior/model"
 	"time"
 
@@ -33,6 +35,9 @@ func TakeIps() (<-chan string, <-chan bool) {
 		iter := db.NewIterator(readOpts)
 		defer iter.Close()
 		cnt := 0
+		param, _ := strconv.Atoi(config.Config("PARAM"))
+		gps, _ := strconv.Atoi(config.Config("GROUPS"))
+		CNT := param * gps
 		for iter.SeekToFirst(); iter.Valid(); iter.Next() {
 			value := iter.Value()
 			node := model.Client{}
@@ -54,7 +59,7 @@ func TakeIps() (<-chan string, <-chan bool) {
 			}
 			out <- ip
 			cnt++
-			if cnt == 5 {
+			if cnt == CNT {
 				break
 			}
 		}
