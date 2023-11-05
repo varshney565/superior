@@ -29,8 +29,9 @@ func TransactionLogic(c *fiber.Ctx) error {
 				if res == false {
 					//error is there
 					err = 1
+				} else {
+					err = 0
 				}
-				err = 0
 				return
 			case fun := <-out:
 				metadata, txn := fun()
@@ -52,8 +53,9 @@ func TransactionLogic(c *fiber.Ctx) error {
 				if res == false {
 					//error is there
 					err_ = 1
+				} else {
+					err_ = 0
 				}
-				err_ = 0
 				return
 			case ip := <-out_:
 				ips = append(ips, ip)
@@ -73,7 +75,7 @@ func TransactionLogic(c *fiber.Ctx) error {
 		}
 	}
 	if err == 1 || err_ == 1 {
-		c.Status(500).JSON(fiber.Map{
+		return c.Status(500).JSON(fiber.Map{
 			"message": "Internal Server Error",
 		})
 	}
